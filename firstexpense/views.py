@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 import json,datetime,csv
-from django.http import FileResponse, JsonResponse,HttpResponse
+from django.http import JsonResponse,HttpResponse
 from userpreferences.models import UserPreference
 import xlwt
 import io
@@ -13,7 +13,7 @@ from expense.settings import GTK_FOLDER
 from django.template.loader import render_to_string
 from weasyprint import HTML
 
-from tempfile import NamedTemporaryFile
+
 from django.db.models import Sum
 
 # Create your views here.

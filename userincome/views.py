@@ -5,8 +5,13 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from userpreferences.models import UserPreference
-import json,datetime
+import json,datetime,csv
 from django.http import JsonResponse
+
+import xlwt
+import io
+from django.template.loader import render_to_string
+from weasyprint import HTML
 
 # Create your views here.
 @login_required(login_url='/auth/login')
@@ -123,13 +128,13 @@ def income_source_summary(request):
     source_list=list(set(map(get_income,incomes)))
 
     def get_income_source_amount(source):
-        amount = 0
+        amount_income = 0
 
         filtered_by_income=incomes.filter(source=source)
         
         for item in filtered_by_income:
-            amount += item.amount
-        return amount
+            amount_income += item.amount
+        return amount_income
     
     for x in incomes:
         for y in source_list:
@@ -140,3 +145,94 @@ def income_source_summary(request):
 
 def income_stats_view(request):
     return render(request,'income/income_stats.html')
+
+# excel
+def export_csv(request):
+
+    response= HttpResponse(content_type='text/csv')
+    #we set the header is used to suggest a filename for the content being sent in the response.
+    response['Content-Disposition']='attachment; filename=Income '+str(datetime.datetime.now())+'.csv'
+
+    writer = csv.writer(response)
+    writer.writerow(['Amount','Description','Source','Date'])
+
+    income = UserIncome.objects.filter(owner=request.user)
+
+    for income in income:
+        writer.writerow([income.amount,income.description,income.source,income.date])
+
+    return response
+
+
+# excel 
+
+def export_excel(request):
+    response= HttpResponse(content_type='application/ms-excel')
+
+    response['Content-Disposition']='attachment; filename=Income '+ str(datetime.datetime.now())+'.xls'
+    wb = xlwt.Workbook(encoding='utf-8')
+    ws = wb.add_sheet('Income')
+    row_num = 0
+    font_style = xlwt.XFStyle()
+    font_style.font.bold = True
+
+    columns = ['Amount','Description','Source','Date']
+
+    for col_num in range(len(columns)):
+        ws.write(row_num,col_num,columns[col_num],font_style)
+
+    font_style = xlwt.XFStyle()
+
+    rows=UserIncome.objects.filter(owner=request.user).values_list('amount','description','source','date')
+
+
+    for row in rows:
+        row_num += 1
+        for col_num, value in enumerate(row):
+            ws.write(row_num, col_num, str(value), font_style)
+
+    wb.save(response)
+    return response
+
+
+
+from django.http import HttpResponse
+from django.template.loader import render_to_string
+from weasyprint import HTML
+import datetime
+from django.db.models import Sum
+
+def export_pdf(request):
+    # Prepare the response object
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename=Income'+ str(datetime.datetime.now())+'.pdf'
+    response['Content-Transfer-Encoding'] = 'binary'
+
+    income = UserIncome.objects.filter(owner=request.user)
+
+    if income:
+        total_sum_income = income.aggregate(Sum('amount'))
+    else:
+        total_sum_income = 0
+
+    context = {
+        'income': income,
+        'total_income': total_sum_income,
+    }
+
+    # Generate PDF content from HTML template
+    html_string = render_to_string('income/pdf-outlet.html', context)
+    print("\n\n\n\nthis is html String\n\n\n\n",html_string)
+    html = HTML(string=html_string)
+    print("\n\n\n\nthis is html\n\n\n\n",html)
+    result = html.write_pdf()
+
+    size_in_bytes = len(result)
+    print("Size of PDF content:", size_in_bytes, "bytes")
+    #print((result))
+
+    pdf_file = io.BytesIO(result)
+
+    # Set response content
+    response.write(pdf_file.getvalue())
+    return response

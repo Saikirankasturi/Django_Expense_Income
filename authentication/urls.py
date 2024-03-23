@@ -12,5 +12,4 @@ urlpatterns = [
     path('activate/<uidb64>/<token>/',csrf_exempt(VerificationView.as_view()),name="activate"),
     path('set-new-password/<uidb64>/<token>/',csrf_exempt(CompletePasswordReset.as_view()),name="reset-user-password"),
     path('request-reset-link/',RequestPasswordResetEmail.as_view(),name="request-password"),
-    
 ]
